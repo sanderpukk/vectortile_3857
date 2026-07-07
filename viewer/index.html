@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Estonia EPSG:3857 vector tiles</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<link href="https://cdn.jsdelivr.net/npm/ol@10.3.1/ol.css" rel="stylesheet"
+      integrity="sha384-Jpg1uvTciFJuHq+90Ly0/2SKRT9yS5OhbIN5FuFoFWji9fc44ok8xxO88CJi8Z5W" crossorigin="anonymous">
+<script src="https://cdn.jsdelivr.net/npm/ol@10.3.1/dist/ol.js"
+        integrity="sha384-GtOM9G1JWFKmDbfOLBrez9YebIrX1pqVVtYukhqrKOtyneLNxnTIFMe8ER850GT/" crossorigin="anonymous"></script>
+<script src="config.js"></script>
+<style>
+  html, body { margin: 0; height: 100%; }
+  #map { position: absolute; inset: 0; background: #f8f4f0; }
+  #panel {
+    position: absolute; top: 10px; left: 10px; z-index: 10;
+    background: rgba(255, 255, 255, 0.94); border-radius: 6px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+    padding: 10px 12px; font: 13px/1.5 system-ui, sans-serif;
+    max-height: calc(100% - 40px); overflow-y: auto; width: 220px;
+  }
+  #panel h1 { margin: 0 0 6px; font-size: 14px; }
+  #meta { color: #555; margin-bottom: 8px; }
+  #panel label.row { display: block; margin-bottom: 8px; }
+  #panel select { width: 100%; }
+  #legend label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+  .swatch { width: 12px; height: 12px; border-radius: 2px; flex: none; }
+  #popup {
+    background: #fff; border-radius: 6px; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+    padding: 8px 10px; min-width: 160px; max-width: 340px; position: relative;
+  }
+  #popup::after {
+    content: ""; position: absolute; bottom: -8px; left: 24px;
+    border: 8px solid transparent; border-top-color: #fff; border-bottom: none;
+  }
+  #popup-close { position: absolute; top: 2px; right: 8px; cursor: pointer; color: #999; text-decoration: none; }
+  .popup-props { font: 12px/1.4 monospace; max-height: 260px; overflow-y: auto; }
+  .popup-props h4 { margin: 6px 0 2px; font: bold 12px system-ui, sans-serif; }
+  .popup-props table { border-collapse: collapse; }
+  .popup-props td { padding: 0 6px 0 0; vertical-align: top; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div id="panel">
+  <h1>Estonia EPSG:3857</h1>
+  <div id="meta"></div>
+  <label class="row">Tile source
+    <select id="source"></select>
+  </label>
+  <div id="legend"></div>
+</div>
+<div id="popup" style="display:none">
+  <a id="popup-close" href="#">✕</a>
+  <div id="popup-content" class="popup-props"></div>
+</div>
+<script>
+"use strict";
+
+const CFG = window.VT_PIPELINE_CONFIG;
+const COLORS = {
+  transportation: "#e8737e",
+  transportation_name: "#9d4b54",
+  water: "#3f8fd1",
+  waterway: "#2f6ea8",
+  landcover: "#7dc383",
+  landuse: "#c9b27a",
+  aeroway: "#b08ad4",
+  building: "#9d968d",
+  boundary: "#8e44ad",
+  place: "#d35400",
+  housenumber: "#7f6a55",
+  park: "#4ca64c",
+  poi: "#c0392b",
+};
+const LABELED = { place: "name", poi: "name", housenumber: "housenumber" };
+
+const params = new URLSearchParams(location.search);
+let source = params.get("src") in CFG.sources ? params.get("src") : CFG.defaultSource;
+const hidden = new Set();
+
+function colorFor(layer) {
+  return COLORS[layer] || "#607d8b";
+}
+
+function rgba(hex, alpha) {
+  const n = parseInt(hex.slice(1), 16);
+  return "rgba(" + (n >> 16) + "," + ((n >> 8) & 255) + "," + (n & 255) + "," + alpha + ")";
+}
+
+// Base styles are cached per tile layer; label text is set per feature.
+const styleCache = {};
+function baseStyles(layer) {
+  if (styleCache[layer]) return styleCache[layer];
+  const color = colorFor(layer);
+  styleCache[layer] = {
+    polygon: new ol.style.Style({
+      fill: new ol.style.Fill({ color: rgba(color, 0.25) }),
+      stroke: new ol.style.Stroke({ color: color, width: 1 }),
+    }),
+    line: new ol.style.Style({
+      stroke: new ol.style.Stroke({
+        color: color,
+        width: 1,
+        lineDash: layer === "boundary" ? [4, 2] : undefined,
+      }),
+    }),
+    point: new ol.style.Style({
+      image: new ol.style.Circle({
+        radius: 3,
+        fill: new ol.style.Fill({ color: rgba(color, 0.8) }),
+      }),
+    }),
+  };
+  return styleCache[layer];
+}
+
+function styleFunction(feature) {
+  const layer = feature.get("layer");
+  if (hidden.has(layer)) return null;
+  const styles = baseStyles(layer);
+  const type = feature.getGeometry().getType();
+  if (type === "Polygon" || type === "MultiPolygon") return styles.polygon;
+  if (type === "LineString" || type === "MultiLineString") return styles.line;
+
+  const labelField = LABELED[layer];
+  const label = labelField ? feature.get(labelField) : undefined;
+  if (!label) return styles.point;
+  return [
+    styles.point,
+    new ol.style.Style({
+      text: new ol.style.Text({
+        text: String(label),
+        font: "11px system-ui, sans-serif",
+        offsetY: 12,
+        fill: new ol.style.Fill({ color: "#333" }),
+        stroke: new ol.style.Stroke({ color: "#fff", width: 2 }),
+      }),
+    }),
+  ];
+}
+
+function makeSource(name) {
+  return new ol.source.VectorTile({
+    format: new ol.format.MVT(),
+    url: CFG.sources[name],
+    minZoom: CFG.minzoom,
+    maxZoom: CFG.maxzoom,
+    attributions: CFG.attribution,
+  });
+}
+
+const tileLayer = new ol.layer.VectorTile({
+  declutter: true,
+  source: makeSource(source),
+  style: styleFunction,
+});
+
+const popupElement = document.getElementById("popup");
+const popup = new ol.Overlay({
+  element: popupElement,
+  positioning: "bottom-left",
+  offset: [-24, -12],
+  stopEvent: true,
+});
+
+const map = new ol.Map({
+  target: "map",
+  layers: [tileLayer],
+  overlays: [popup],
+  view: new ol.View({
+    center: ol.proj.fromLonLat(CFG.center),
+    zoom: 6,
+    // Tiles stop at maxzoom (15); OpenLayers overzooms the z15 vector
+    // tiles beyond that, so z18+ display stays crisp.
+    maxZoom: CFG.maxzoom + 5,
+  }),
+});
+
+function updateMeta() {
+  const zoom = map.getView().getZoom();
+  document.getElementById("meta").textContent =
+    "zoom " + (zoom === undefined ? "-" : zoom.toFixed(2)) + " — tiles z" + CFG.minzoom + "-" + CFG.maxzoom;
+}
+map.on("moveend", updateMeta);
+updateMeta();
+
+map.on("singleclick", (evt) => {
+  const seen = new Set();
+  const parts = [];
+  map.forEachFeatureAtPixel(evt.pixel, (feature) => {
+    const props = feature.getProperties();
+    delete props.geometry;
+    const layer = props.layer;
+    delete props.layer;
+    const key = layer + "|" + JSON.stringify(props);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    const rows = Object.entries(props)
+      .map(([k, v]) => "<tr><td><b>" + k + "</b></td><td>" + String(v) + "</td></tr>")
+      .join("");
+    parts.push("<h4>" + layer + "</h4><table>" + rows + "</table>");
+    return parts.length >= 8;
+  }, { hitTolerance: 4 });
+  if (!parts.length) {
+    popupElement.style.display = "none";
+    popup.setPosition(undefined);
+    return;
+  }
+  document.getElementById("popup-content").innerHTML = parts.join("");
+  popupElement.style.display = "block";
+  popup.setPosition(evt.coordinate);
+});
+document.getElementById("popup-close").addEventListener("click", (e) => {
+  e.preventDefault();
+  popupElement.style.display = "none";
+  popup.setPosition(undefined);
+});
+
+const select = document.getElementById("source");
+for (const name of Object.keys(CFG.sources)) {
+  const option = document.createElement("option");
+  option.value = name;
+  option.textContent = name;
+  option.selected = name === source;
+  select.appendChild(option);
+}
+select.addEventListener("change", () => {
+  source = select.value;
+  const url = new URL(location.href);
+  url.searchParams.set("src", source);
+  history.replaceState(null, "", url);
+  tileLayer.setSource(makeSource(source));
+});
+
+const legend = document.getElementById("legend");
+for (const layer of CFG.layers) {
+  const label = document.createElement("label");
+  const checkbox = document.createElement("input");
+  checkbox.type = "checkbox";
+  checkbox.checked = true;
+  checkbox.addEventListener("change", () => {
+    if (checkbox.checked) hidden.delete(layer); else hidden.add(layer);
+    tileLayer.changed();
+  });
+  const swatch = document.createElement("span");
+  swatch.className = "swatch";
+  swatch.style.background = colorFor(layer);
+  label.append(checkbox, swatch, document.createTextNode(layer));
+  legend.appendChild(label);
+}
+</script>
+</body>
+</html>

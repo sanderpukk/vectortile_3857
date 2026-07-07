@@ -1,0 +1,29 @@
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+
+# Generated pipeline outputs
+dist/
+data/
+tiles/
+*.mbtiles
+*.pmtiles
+*.gpkg
+
+# Docker overrides
+docker-compose.override.yml
+
+# Editor and OS files
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini

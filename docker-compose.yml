@@ -1,0 +1,89 @@
+name: vt-3857-planetiler
+
+services:
+  data-prep:
+    build: .
+    command: ["prepare"]
+    environment:
+      SOURCES_DIR: /data/sources
+    volumes:
+      - vt_data:/data
+
+  preprocess:
+    build: .
+    command: ["preprocess"]
+    environment:
+      SOURCES_DIR: /data/sources
+      OUTPUT: /data/basemap.gpkg
+    volumes:
+      - vt_data:/data
+
+  generate:
+    build: .
+    command: ["generate", "--mode", "${MODE:-estonia}"]
+    environment:
+      DATA_DIR: /data
+      OUT_DIR: /out
+      TMP_DIR: /tiletmp
+    volumes:
+      - vt_data:/data
+      - vt_tiles:/out
+      - vt_tmp:/tiletmp
+
+  package:
+    build: .
+    command: ["package", "--mode", "${MODE:-estonia}"]
+    environment:
+      OUT_DIR: /out
+      DIST_DIR: /dist
+    volumes:
+      - vt_tiles:/out
+      - ./dist:/dist
+
+  pipeline:
+    build: .
+    command: ["run-all", "--mode", "${MODE:-estonia}"]
+    environment:
+      SOURCES_DIR: /data/sources
+      DATA_DIR: /data
+      OUT_DIR: /out
+      TMP_DIR: /tiletmp
+      VIEWER_CONFIG: /app/viewer/config.js
+    volumes:
+      - vt_data:/data
+      - vt_tiles:/out
+      - vt_tmp:/tiletmp
+      - ./viewer:/app/viewer
+
+  viewer-config:
+    build: .
+    command: ["viewer-config"]
+    volumes:
+      - ./viewer:/app/viewer
+
+  martin:
+    # Serves the generated PMTiles archives; auto-discovers /tiles/*.pmtiles
+    # (source id = file name, e.g. /estonia/{z}/{x}/{y}).
+    image: ghcr.io/maplibre/martin:latest
+    command: ["/tiles"]
+    ports:
+      - "3000:3000"
+    volumes:
+      - vt_tiles:/tiles:ro
+
+  viewer:
+    image: nginx:alpine
+    ports:
+      # 8081 so this viewer can run next to the 3301 viewer on 8080.
+      - "8081:80"
+    depends_on:
+      - martin
+    volumes:
+      - ./viewer/index.html:/usr/share/nginx/html/index.html:ro
+      - ./viewer/config.js:/usr/share/nginx/html/config.js:ro
+      - ./viewer/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+
+volumes:
+  vt_data:
+  vt_tiles:
+  vt_tmp:
