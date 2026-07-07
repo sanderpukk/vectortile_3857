@@ -1,7 +1,7 @@
 # Estonia EPSG:3857 Python + Planetiler pipeline
 
-This folder is the Web Mercator (EPSG:3857) sibling of the EPSG:3301 GDAL
-pipeline. Python owns the data download, preprocessing layer mapping,
+This repo is the Web Mercator (EPSG:3857) sibling of the
+[EPSG:3301 pipeline](https://github.com/sanderpukk/vectortile_3301). Python owns the data download, preprocessing layer mapping,
 classifier SQL, and tile settings — the same logic as the 3301 build. GDAL
 still does the preprocessing through CLI subprocesses,
 [Planetiler](https://github.com/onthegomap/planetiler) builds a single
@@ -9,8 +9,8 @@ still does the preprocessing through CLI subprocesses,
 it over HTTP (the same approach as Lithuania's
 [national-basemap](https://github.com/govlt/national-basemap)).
 
-The folder is self-contained (own Docker image, compose project, volumes, and
-viewer) so it can be moved to its own repository.
+This repo is self-contained (own Docker image, compose project, volumes, and
+viewer).
 
 ## Layout
 
@@ -151,7 +151,7 @@ python3 -m vt3857 run-all --mode tallinn
 `config/settings.py`. You normally edit the Python settings file, not the
 generated schema. (The schema is emitted as JSON, which is valid YAML.)
 
-## How this relates to the EPSG:3301 pipeline
+## How this relates to the [EPSG:3301 pipeline](https://github.com/sanderpukk/vectortile_3301)
 
 - The download step and the classification SQL in `layers.py` are identical;
   only the zoom band names and the per-feature `minzoom` values differ.
