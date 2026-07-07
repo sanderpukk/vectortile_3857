@@ -10,7 +10,7 @@ __pycache__/
 venv/
 
 # Generated pipeline outputs
-dist/
+dist/*
 data/
 tiles/
 *.mbtiles
