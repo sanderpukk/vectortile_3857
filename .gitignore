@@ -11,6 +11,7 @@ venv/
 
 # Generated pipeline outputs
 dist/*
+!dist/.gitkeep
 data/
 tiles/
 *.mbtiles
