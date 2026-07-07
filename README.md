@@ -30,7 +30,6 @@ viewer).
 From PowerShell:
 
 ```powershell
-cd C:\vectortile\python-pipeline\planetiler-3857
 docker compose run --rm pipeline
 docker compose run --rm package
 docker compose up viewer
@@ -98,7 +97,6 @@ docker compose run --rm -e SKIP_ADS=1 pipeline
 ## Run steps separately
 
 ```powershell
-cd C:\vectortile\python-pipeline\planetiler-3857
 docker compose run --rm data-prep                 # add -e SKIP_ADS=1 to skip ADS
 docker compose run --rm preprocess
 docker compose run --rm generate
