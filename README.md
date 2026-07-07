@@ -12,6 +12,24 @@ it over HTTP (the same approach as Lithuania's
 This repo is self-contained (own Docker image, compose project, volumes, and
 viewer).
 
+## Architecture
+
+```mermaid
+flowchart TD
+    etak["Estonian Land Board<br><a href='https://geoportaal.maaamet.ee/est/ruumiandmed/eesti-topograafia-andmekogu-p101.html'>ETAK topographic database</a>"]-->prepare
+    ehak["Statistics Estonia<br><a href='https://www.stat.ee/en'>EHAK administrative units</a>"]-->prepare
+    ads["AKS WFS (optional)<br><a href='https://aks.geoportaal.ee/'>ADS city districts & places</a>"]-.->prepare
+
+    prepare["<b>prepare</b><br>download sources (EPSG:3301)"]-->|"etak.gpkg / ehak.gpkg / ads.gpkg"|preprocess
+    preprocess["<b>preprocess</b><br>classification SQL + reproject to EPSG:3857"]-->|"basemap.gpkg"|generate
+    settings["config/settings.py<br>zoom, mode, layer mapping"]-.->|"custommap schema"|generate
+    generate["<b>generate</b><br><a href='https://github.com/onthegomap/planetiler'>Planetiler</a>"]-->pmtiles["estonia.pmtiles<br>PMTiles archive"]
+
+    pmtiles-->package["<b>package</b>"]-->dist["dist/estonia.pmtiles<br>datapackage (final deliverable)"]
+    pmtiles-->martin["<a href='https://github.com/maplibre/martin'>Martin</a><br>tile server :3000"]
+    martin-->|"nginx /tiles proxy"|viewer["OpenLayers viewer<br>nginx :8081"]
+```
+
 ## Layout
 
 | Path | Purpose |
