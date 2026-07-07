@@ -16,9 +16,9 @@ viewer).
 
 ```mermaid
 flowchart TD
-    etak["Estonian Land Board<br><a href='https://geoportaal.maaamet.ee/est/ruumiandmed/eesti-topograafia-andmekogu-p101.html'>ETAK topographic database</a>"]-->prepare
-    ehak["Statistics Estonia<br><a href='https://www.stat.ee/en'>EHAK administrative units</a>"]-->prepare
-    ads["AKS WFS (optional)<br><a href='https://aks.geoportaal.ee/'>ADS city districts & places</a>"]-.->prepare
+    etak["Estonian Land Board<br><a href='https://geoportaal.maaamet.ee/index.php?lang_id=2&plugin_act=otsing&andmetyyp=ETAK&dl=1&f=ETAK_EESTI_GPKG.zip&page_id=618'>ETAK topographic database</a>"]-->prepare
+    ehak["Land Board cadastre S3<br><a href='https://s3.pilw.io/rp-kemit-kataster/EHAK'>EHAK administrative units</a><br>(maakond / omavalitsus / asustusüksus)"]-->prepare
+    ads["AKS WFS (optional)<br><a href='https://aks.geoportaal.ee/aks-ogc'>ADS city districts & places</a>"]-.->prepare
 
     prepare["<b>prepare</b><br>download sources (EPSG:3301)"]-->|"etak.gpkg / ehak.gpkg / ads.gpkg"|preprocess
     preprocess["<b>preprocess</b><br>classification SQL + reproject to EPSG:3857"]-->|"basemap.gpkg"|generate
